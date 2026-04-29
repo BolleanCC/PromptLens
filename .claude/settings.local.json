@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm install *)",
+      "Bash(npm --version)",
+      "Bash(npx shadcn@latest add card textarea select badge progress tabs accordion separator skeleton alert table --yes)",
+      "Bash(mkdir -p /c/Users/songt/prompt-lens/prisma)",
+      "Bash(mkdir -p /c/Users/songt/prompt-lens/lib/llm)",
+      "Bash(mkdir -p /c/Users/songt/prompt-lens/lib/validations)",
+      "Bash(mkdir -p /c/Users/songt/prompt-lens/app/api/evaluate)",
+      "Bash(mkdir -p /c/Users/songt/prompt-lens/app/history)",
+      "Bash(npx prisma *)",
+      "Bash(node *)",
+      "Bash(npx tsc *)",
+      "Bash(npm run *)",
+      "Bash(npm uninstall *)"
+    ]
+  }
+}
