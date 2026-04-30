@@ -4,6 +4,7 @@ import Link from 'next/link'
 import './globals.css'
 import { getUser } from '@/lib/auth/session'
 import { SignOutButton } from '@/components/auth/sign-out-button'
+import { Button } from '@/components/ui/button'
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -32,7 +33,23 @@ export default async function RootLayout({
       <body className="min-h-full flex flex-col">
         <header className="border-b bg-background">
           <div className="max-w-6xl mx-auto px-4 h-14 flex items-center justify-between">
-            <Link href="/" className="font-bold text-lg tracking-tight">
+            <Link href="/" className="flex items-center gap-2 font-bold text-lg tracking-tight">
+              {/* Lens icon */}
+              <svg
+                width="20"
+                height="20"
+                viewBox="0 0 20 20"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.75"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <circle cx="9" cy="9" r="6" />
+                <circle cx="9" cy="9" r="2.25" opacity="0.55" />
+                <path d="M13.5 13.5 17 17" />
+              </svg>
               PromptLens
             </Link>
             <nav className="flex items-center gap-6 text-sm font-medium">
@@ -66,12 +83,9 @@ export default async function RootLayout({
                   >
                     Sign in
                   </Link>
-                  <Link
-                    href="/sign-up"
-                    className="text-muted-foreground hover:text-foreground transition-colors"
-                  >
-                    Sign up
-                  </Link>
+                  <Button asChild size="sm" className="rounded-lg">
+                    <Link href="/sign-up">Sign up</Link>
+                  </Button>
                 </>
               )}
             </nav>
