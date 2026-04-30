@@ -5,6 +5,11 @@ import { gradeResponse } from '@/lib/llm/grade-response'
 import { prisma } from '@/lib/db'
 import { getUser } from '@/lib/auth/session'
 
+type StreamEvent =
+  | { type: 'status'; message: string }
+  | { type: 'result'; data: unknown }
+  | { type: 'error'; message: string }
+
 export async function POST(req: NextRequest) {
   // Auth check — userId comes from the server session, never from the client
   const user = await getUser()
@@ -26,52 +31,66 @@ export async function POST(req: NextRequest) {
 
   const { userPrompt, model, taskType, evaluationMode } = parsed.data
 
-  let generatedResponse: string
-  try {
-    generatedResponse = await generateResponse(userPrompt, model)
-  } catch (err) {
-    const message = err instanceof Error ? err.message : 'Failed to generate response'
-    return NextResponse.json({ error: message }, { status: 500 })
-  }
+  const encoder = new TextEncoder()
+  const stream = new ReadableStream<Uint8Array>({
+    async start(controller) {
+      const send = (evt: StreamEvent) => {
+        controller.enqueue(encoder.encode(JSON.stringify(evt) + '\n'))
+      }
 
-  let graderResult: Awaited<ReturnType<typeof gradeResponse>>
-  try {
-    graderResult = await gradeResponse(
-      userPrompt,
-      generatedResponse,
-      taskType ?? 'general',
-      evaluationMode ?? 'balanced'
-    )
-  } catch (err) {
-    const message = err instanceof Error ? err.message : 'Failed to grade response'
-    return NextResponse.json({ error: message }, { status: 500 })
-  }
+      try {
+        send({ type: 'status', message: 'Prompt received' })
+        send({ type: 'status', message: 'Analyzing prompt structure' })
 
-  let evaluation
-  try {
-    evaluation = await prisma.promptEvaluation.create({
-      data: {
-        userId: user.id,
-        userPrompt,
-        generatedResponse,
-        score: graderResult.score,
-        grade: graderResult.grade,
-        summary: graderResult.summary,
-        strengths: graderResult.strengths,
-        weaknesses: graderResult.weaknesses,
-        suggestions: graderResult.suggestions,
-        improvedPrompt: graderResult.improved_prompt,
-        model: model ?? 'claude-haiku-4-5-20251001',
-        taskType: taskType ?? 'general',
-        evaluationMode: evaluationMode ?? 'balanced',
-      },
-    })
-  } catch {
-    return NextResponse.json(
-      { error: 'Evaluation completed, but saving failed.', result: graderResult, generatedResponse },
-      { status: 500 }
-    )
-  }
+        send({ type: 'status', message: 'Generating a sample response' })
+        const generatedResponse = await generateResponse(userPrompt, model)
 
-  return NextResponse.json({ evaluation })
+        send({ type: 'status', message: 'Evaluating clarity and specificity' })
+        send({ type: 'status', message: 'Generating improvement suggestions' })
+        const graderResult = await gradeResponse(
+          userPrompt,
+          generatedResponse,
+          taskType ?? 'general',
+          evaluationMode ?? 'balanced'
+        )
+
+        send({ type: 'status', message: 'Building final score card' })
+
+        const evaluation = await prisma.promptEvaluation.create({
+          data: {
+            userId: user.id,
+            userPrompt,
+            generatedResponse,
+            score: graderResult.score,
+            grade: graderResult.grade,
+            summary: graderResult.summary,
+            strengths: graderResult.strengths,
+            weaknesses: graderResult.weaknesses,
+            suggestions: graderResult.suggestions,
+            improvedPrompt: graderResult.improved_prompt,
+            model: model ?? 'claude-haiku-4-5-20251001',
+            taskType: taskType ?? 'general',
+            evaluationMode: evaluationMode ?? 'balanced',
+          },
+        })
+
+        send({ type: 'result', data: evaluation })
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Evaluation failed'
+        send({ type: 'error', message })
+      } finally {
+        controller.close()
+      }
+    },
+  })
+
+  return new Response(stream, {
+    headers: {
+      'Content-Type': 'text/plain; charset=utf-8',
+      'Cache-Control': 'no-cache',
+      // Helps some reverse proxies avoid buffering.
+      'X-Accel-Buffering': 'no',
+    },
+  })
 }
+

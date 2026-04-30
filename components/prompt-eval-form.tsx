@@ -10,9 +10,9 @@ import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { Skeleton } from '@/components/ui/skeleton'
 import { GeneratedResponseCard } from './generated-response-card'
 import { PromptScoreCard } from '@/components/evaluation/PromptScoreCard'
+import { EvaluationProgressCard } from '@/components/evaluation/EvaluationProgressCard'
 
 const formSchema = z.object({
   userPrompt: z.string().min(5, 'Prompt must be at least 5 characters'),
@@ -61,6 +61,7 @@ export function PromptEvalForm() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [result, setResult] = useState<EvaluationResult | null>(null)
+  const [progressMessages, setProgressMessages] = useState<string[]>([])
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -76,6 +77,7 @@ export function PromptEvalForm() {
     setLoading(true)
     setError(null)
     setResult(null)
+    setProgressMessages(['Prompt received'])
 
     try {
       const res = await fetch('/api/evaluate', {
@@ -84,14 +86,62 @@ export function PromptEvalForm() {
         body: JSON.stringify(values),
       })
 
-      const data = await res.json()
-
       if (!res.ok) {
-        setError(typeof data.error === 'string' ? data.error : 'Evaluation failed')
+        // Non-streaming errors (e.g. Unauthorized, validation)
+        const data = await res.json().catch(() => null)
+        setError(
+          (data && typeof data.error === 'string' && data.error) ||
+            'Evaluation failed'
+        )
         return
       }
 
-      setResult(data.evaluation)
+      const reader = res.body?.getReader()
+      if (!reader) {
+        setError('No response stream. Please try again.')
+        return
+      }
+
+      const decoder = new TextDecoder()
+      let buffer = ''
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+
+        buffer += decoder.decode(value, { stream: true })
+
+        let newlineIndex = buffer.indexOf('\n')
+        while (newlineIndex !== -1) {
+          const line = buffer.slice(0, newlineIndex).trim()
+          buffer = buffer.slice(newlineIndex + 1)
+
+          if (line.length > 0) {
+            try {
+              const evt = JSON.parse(line) as
+                | { type: 'status'; message: string }
+                | { type: 'result'; data: EvaluationResult }
+                | { type: 'error'; message: string }
+
+              if (evt.type === 'status') {
+                setProgressMessages((prev) => [...prev, evt.message])
+              } else if (evt.type === 'result') {
+                setResult(evt.data)
+                await reader.cancel()
+                return
+              } else if (evt.type === 'error') {
+                setError(evt.message || 'Evaluation failed')
+                await reader.cancel()
+                return
+              }
+            } catch {
+              // Ignore malformed stream lines; the next chunk may complete it.
+            }
+          }
+
+          newlineIndex = buffer.indexOf('\n')
+        }
+      }
     } catch {
       setError('Network error. Please try again.')
     } finally {
@@ -189,13 +239,7 @@ export function PromptEvalForm() {
         </Alert>
       )}
 
-      {loading && (
-        <div className="space-y-4">
-          <Skeleton className="h-32 w-full" />
-          <Skeleton className="h-24 w-full" />
-          <Skeleton className="h-48 w-full" />
-        </div>
-      )}
+      {loading && <EvaluationProgressCard messages={progressMessages} />}
 
       {result && !loading && (
         <div className="space-y-4">
