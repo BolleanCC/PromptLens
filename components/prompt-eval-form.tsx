@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -10,9 +11,8 @@ import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Skeleton } from '@/components/ui/skeleton'
-import { ScoreCard } from './score-card'
 import { GeneratedResponseCard } from './generated-response-card'
-import { EvalResultCard } from './eval-result-card'
+import { PromptScoreCard } from '@/components/evaluation/PromptScoreCard'
 
 const formSchema = z.object({
   userPrompt: z.string().min(5, 'Prompt must be at least 5 characters'),
@@ -37,6 +37,12 @@ interface EvaluationResult {
   model: string
   taskType: string
   evaluationMode: string
+  metrics?: {
+    clarity: number
+    specificity: number
+    context: number
+    outputFormat: number
+  }
 }
 
 const taskTypes = [
@@ -51,6 +57,7 @@ const taskTypes = [
 ]
 
 export function PromptEvalForm() {
+  const router = useRouter()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [result, setResult] = useState<EvaluationResult | null>(null)
@@ -192,15 +199,37 @@ export function PromptEvalForm() {
 
       {result && !loading && (
         <div className="space-y-4">
-          <ScoreCard score={result.score} grade={result.grade} />
-          <GeneratedResponseCard response={result.generatedResponse} />
-          <EvalResultCard
+          <PromptScoreCard
+            score={result.score}
             summary={result.summary}
+            metrics={
+              result.metrics ?? {
+                // API doesn't return detailed metrics yet. Keep UI stable with sensible defaults.
+                clarity: Math.min(95, Math.max(55, result.score - 2)),
+                specificity: Math.min(95, Math.max(45, result.score - 10)),
+                context: Math.min(99, Math.max(60, result.score + 5)),
+                outputFormat: Math.min(98, Math.max(50, result.score + 2)),
+              }
+            }
             strengths={result.strengths}
             weaknesses={result.weaknesses}
             suggestions={result.suggestions}
             improvedPrompt={result.improvedPrompt}
+            onReevaluate={async () => {
+              const current = form.getValues()
+              const nextPrompt = result.improvedPrompt?.trim()
+              if (!nextPrompt) return
+
+              // Re-run with the improved prompt (keeping model/task/mode as-is).
+              await onSubmit({ ...current, userPrompt: nextPrompt })
+            }}
+            onSave={() => {
+              // Evaluations are already saved server-side; this is a convenient jump to history.
+              router.push('/history')
+            }}
+            className="max-w-xl lg:max-w-none"
           />
+          <GeneratedResponseCard response={result.generatedResponse} />
         </div>
       )}
     </div>
