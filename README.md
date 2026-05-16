@@ -1,6 +1,6 @@
 # PromptLens
 
-A full-stack prompt evaluation app. Submit any AI prompt, get a generated response, and receive a detailed score with strengths, weaknesses, and an improved version — all powered by Claude.
+A full-stack prompt evaluation app for developers and prompt engineers. Submit any AI prompt, get a generated response, and receive a detailed score with strengths, weaknesses, and an improved version — all powered by Claude.
 
 ---
 
@@ -16,15 +16,15 @@ A full-stack prompt evaluation app. Submit any AI prompt, get a generated respon
 
 ## Tech stack
 
-| Layer | Technology |
-|-------|-----------|
-| Framework | Next.js 16 (App Router) |
-| Language | TypeScript |
-| Styling | Tailwind CSS v4 + shadcn/ui |
-| Forms | React Hook Form + Zod |
-| Database | PostgreSQL (Neon) via Prisma |
-| LLM | Anthropic Claude (Haiku, Sonnet, Opus) |
-| Auth | Custom — bcrypt, HTTP-only cookies, DB sessions |
+| Layer     | Technology                                      |
+|-----------|-------------------------------------------------|
+| Framework | Next.js 16 (App Router)                         |
+| Language  | TypeScript                                      |
+| Styling   | Tailwind CSS v4 + shadcn/ui                     |
+| Forms     | React Hook Form + Zod                           |
+| Database  | PostgreSQL (Neon) via Prisma                    |
+| LLM       | Anthropic Claude (Haiku, Sonnet, Opus)          |
+| Auth      | Custom — bcrypt, HTTP-only cookies, DB sessions |
 
 ---
 
@@ -108,73 +108,56 @@ middleware.ts                   # Edge middleware — protects /evaluate, /histo
 ## Evaluation grading
 
 The grader uses Claude Haiku with a structured rubric:
-
-| Criterion | Points |
-|-----------|--------|
-| Clarity | 25 |
-| Context | 20 |
-| Specificity | 20 |
-| Output format | 15 |
-| Constraint control | 10 |
-| Response usefulness | 10 |
-
+| Criterion            | Points |
+|----------------------|--------|
+| Clarity              | 25     |
+| Context              | 20     |
+| Specificity          | 20     |
+| Output format        | 15     |
+| Constraint control   | 10     |
+| Response usefulness  | 10     |
 Grade labels: **Poor** (0–49) · **Fair** (50–69) · **Good** (70–89) · **Excellent** (90–100)
 
 ---
-
 ## Getting started
-
 ### Prerequisites
-
 - Node.js 18+
 - A [Neon](https://neon.tech) PostgreSQL database
 - An [Anthropic](https://console.anthropic.com) API key
-
-### 1. Install dependencies
-
+### 1. Clone the repository
+```bash
+git clone https://github.com/BolleanCC/PromptLens.git
+cd PromptLens
+```
+### 2. Install dependencies
 ```bash
 npm install
 ```
-
-### 2. Set environment variables
-
-Create a `.env` file in the project root:
-
+### 3. Set environment variables
+Create a `.env` file in the project root. See the [Environment variables](#environment-variables) section for the full list.
 ```env
 DATABASE_URL=postgresql://...
 ANTHROPIC_API_KEY=sk-ant-...
 ```
-
-### 3. Push the database schema
-
+### 4. Push the database schema
 ```bash
 npx prisma db push
 ```
-
-### 4. Start the dev server
-
+### 5. Start the dev server
 ```bash
 npm run dev
 ```
-
 Open [http://localhost:3000](http://localhost:3000).
-
 ---
-
 ## Environment variables
-
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `DATABASE_URL` | Yes | Neon PostgreSQL connection string |
-| `ANTHROPIC_API_KEY` | Yes | Anthropic API key for Claude |
-
+| Variable            | Required | Description                       |
+|---------------------|----------|-----------------------------------|
+| `DATABASE_URL`      | Yes      | Neon PostgreSQL connection string |
+| `ANTHROPIC_API_KEY` | Yes      | Anthropic API key for Claude      |
 ---
-
 ## Deployment (Vercel)
-
 1. Push the repo to GitHub
 2. Import the project in [Vercel](https://vercel.com)
 3. Add `DATABASE_URL` and `ANTHROPIC_API_KEY` in the Vercel environment variables settings
 4. Deploy — `prisma generate` runs automatically via the `postinstall` and `build` scripts
-
-The Neon database is a cloud service, so no extra setup is needed after `prisma db push`.
+The Neon database is a shared cloud service — no additional database setup is required for deployment since you already ran `prisma db push` during local setup.
