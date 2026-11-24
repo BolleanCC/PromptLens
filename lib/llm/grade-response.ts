@@ -1,9 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk'
-import {
-  graderResultSchema,
-  type EvaluationMode,
-  type GraderResult,
-} from '../validations/evaluation-schema'
+import { type EvaluationMode, type GraderResult } from '../validations/evaluation-schema'
+import { parseGraderOutput } from './parse-grader-output'
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
@@ -103,20 +100,5 @@ Task type: ${taskType}`
   const block = message.content[0]
   const raw = block.type === 'text' ? block.text : ''
 
-  // Strip markdown code fences if the model wraps the JSON
-  const cleaned = raw.replace(/^```(?:json)?\n?/i, '').replace(/\n?```$/i, '').trim()
-
-  let parsed: unknown
-  try {
-    parsed = JSON.parse(cleaned)
-  } catch {
-    throw new Error('Grader returned invalid JSON.')
-  }
-
-  const result = graderResultSchema.safeParse(parsed)
-  if (!result.success) {
-    throw new Error(`Grader response validation failed: ${result.error.message}`)
-  }
-
-  return result.data
+  return parseGraderOutput(raw)
 }
