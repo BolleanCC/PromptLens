@@ -1,5 +1,9 @@
 import Anthropic from '@anthropic-ai/sdk'
-import { graderResultSchema, type GraderResult } from '../validations/evaluation-schema'
+import {
+  graderResultSchema,
+  type EvaluationMode,
+  type GraderResult,
+} from '../validations/evaluation-schema'
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
@@ -54,11 +58,29 @@ Return this exact JSON structure:
   "improved_prompt": string
 }`
 
+const MODE_INSTRUCTIONS: Record<EvaluationMode, string> = {
+  strict: `Evaluation mode: STRICT
+- Do not give the benefit of the doubt. If a criterion is not explicitly addressed in the prompt, award 0 points for it.
+- Treat anything implied but not stated (audience, format, length, tone) as missing.
+- A score of 90 or above requires every criterion to be explicitly and fully satisfied.
+- List every weakness you find, including minor ones.`,
+
+  balanced: `Evaluation mode: BALANCED
+- Award partial credit when a criterion is partly addressed or reasonably implied by the task.
+- Judge the prompt against what a typical user would need for this task type.
+- Focus weaknesses and suggestions on the issues that most affect the response quality.`,
+
+  lenient: `Evaluation mode: LENIENT
+- Give the benefit of the doubt: if missing details can be reasonably inferred from the task, award most of the points for that criterion.
+- Do not penalize missing output format or constraints for simple, casual tasks where defaults are acceptable.
+- Limit weaknesses and suggestions to the 1-2 most impactful improvements, phrased encouragingly.`,
+}
+
 export async function gradeResponse(
   userPrompt: string,
   generatedResponse: string,
   taskType: string,
-  evaluationMode: string
+  evaluationMode: EvaluationMode
 ): Promise<GraderResult> {
   if (!process.env.ANTHROPIC_API_KEY) {
     throw new Error('Missing LLM API key. Please configure your environment variables.')
@@ -68,13 +90,13 @@ export async function gradeResponse(
 
 Generated LLM response: ${generatedResponse}
 
-Task type: ${taskType}
-Evaluation mode: ${evaluationMode}`
+Task type: ${taskType}`
 
   const message = await client.messages.create({
     model: 'claude-haiku-4-5-20251001',
     max_tokens: 1500,
-    system: GRADER_SYSTEM_PROMPT,
+    temperature: 0,
+    system: `${GRADER_SYSTEM_PROMPT}\n\n${MODE_INSTRUCTIONS[evaluationMode]}`,
     messages: [{ role: 'user', content: userMessage }],
   })
 

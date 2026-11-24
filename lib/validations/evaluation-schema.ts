@@ -1,10 +1,13 @@
 import { z } from 'zod'
 
+export const evaluationModes = ['strict', 'balanced', 'lenient'] as const
+export type EvaluationMode = (typeof evaluationModes)[number]
+
 export const evaluationRequestSchema = z.object({
   userPrompt: z.string().min(5, 'Prompt must be at least 5 characters'),
   model: z.string().optional().default('gpt-4.1-mini'),
   taskType: z.string().optional().default('general'),
-  evaluationMode: z.string().optional().default('balanced'),
+  evaluationMode: z.enum(evaluationModes).optional().default('balanced'),
 })
 
 export const graderResultSchema = z.object({
